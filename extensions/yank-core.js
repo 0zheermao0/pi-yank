@@ -14,6 +14,23 @@
  * @returns {CodeBlock[]}
  */
 export function extractCodeBlocks(markdown) {
+	const topLevelBlocks = extractTopLevelCodeBlocks(markdown);
+	if (topLevelBlocks.length === 1) {
+		const [wrapper] = topLevelBlocks;
+		const innerBlocks = extractTopLevelCodeBlocks(wrapper.content);
+		if (innerBlocks.length > 1) {
+			return withPreviews(innerBlocks);
+		}
+	}
+
+	return withPreviews(topLevelBlocks);
+}
+
+/**
+ * @param {string} markdown
+ * @returns {CodeBlock[]}
+ */
+function extractTopLevelCodeBlocks(markdown) {
 	/** @type {CodeBlock[]} */
 	const blocks = [];
 	/** @type {OpenCodeBlock[]} */
@@ -59,9 +76,8 @@ export function extractCodeBlocks(markdown) {
 
 			const finishedBlock = openBlocks.pop();
 			if (finishedBlock && openBlocks.length === 0) {
-				const content = finishedBlock.lines.join("\n");
 				blocks.push({
-					content,
+					content: finishedBlock.lines.join("\n"),
 					preview: "",
 					startLine: finishedBlock.startLine,
 					infoString: finishedBlock.infoString,
@@ -82,16 +98,18 @@ export function extractCodeBlocks(markdown) {
 		});
 	}
 
-	return blocks
-		.sort((left, right) => left.startLine - right.startLine)
-		.map((block, index) => ({
-			...block,
-			preview: buildCodeBlockPreview(
-				block.content,
-				index + 1,
-				block.infoString,
-			),
-		}));
+	return blocks.sort((left, right) => left.startLine - right.startLine);
+}
+
+/**
+ * @param {CodeBlock[]} blocks
+ * @returns {CodeBlock[]}
+ */
+function withPreviews(blocks) {
+	return blocks.map((block, index) => ({
+		...block,
+		preview: buildCodeBlockPreview(block.content, index + 1, block.infoString),
+	}));
 }
 
 /**
