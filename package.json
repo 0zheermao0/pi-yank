@@ -1,0 +1,23 @@
+{
+	"name": "pi-yank",
+	"private": false,
+	"version": "0.1.0",
+	"type": "module",
+	"description": "Lightweight /yank extension for pi that copies the last assistant message or a selected code block.",
+	"keywords": [
+		"pi-package"
+	],
+	"license": "MIT",
+	"scripts": {
+		"build": "echo 'nothing to build'",
+		"check": "node --test tests/*.test.mjs"
+	},
+	"peerDependencies": {
+		"@mariozechner/pi-coding-agent": "*"
+	},
+	"pi": {
+		"extensions": [
+			"./extensions/yank.ts"
+		]
+	}
+}
