@@ -2,57 +2,15 @@ import {
 	copyToClipboard,
 	type ExtensionAPI,
 	type ExtensionCommandContext,
-	type SessionEntry,
 } from "@mariozechner/pi-coding-agent";
 import { extractCodeBlocks } from "./yank-core.js";
+import { getNthLatestAssistantText, parseYankArgs } from "./yank-helpers.js";
 
-interface AssistantMessageLike {
-	role?: unknown;
-	stopReason?: unknown;
-	content?: unknown;
-}
-
-const COPY_SUCCESS_MESSAGE = "Copied last agent message to clipboard";
+const COPY_SUCCESS_MESSAGE = "Copied agent message to clipboard";
 const COPY_EMPTY_MESSAGE = "No agent messages to copy yet.";
 const COPY_CODE_BLOCK_SUCCESS_MESSAGE = "Copied code block to clipboard";
 const MENU_DISABLED_MESSAGE =
-	"Future /yank commands will copy the full last message in this session";
-
-function getLastAssistantText(entries: SessionEntry[]): string | undefined {
-	for (let i = entries.length - 1; i >= 0; i--) {
-		const entry = entries[i];
-		if (entry.type !== "message") continue;
-
-		const message = entry.message as AssistantMessageLike;
-		if (message.role !== "assistant") continue;
-
-		const text = extractAssistantText(message);
-		if (text) return text;
-	}
-
-	return undefined;
-}
-
-function extractAssistantText(
-	message: AssistantMessageLike,
-): string | undefined {
-	const content = Array.isArray(message.content) ? message.content : [];
-	if (message.stopReason === "aborted" && content.length === 0) {
-		return undefined;
-	}
-
-	let text = "";
-	for (const item of content) {
-		if (!item || typeof item !== "object") continue;
-		const part = item as { type?: unknown; text?: unknown };
-		if (part.type === "text" && typeof part.text === "string") {
-			text += part.text;
-		}
-	}
-
-	const trimmed = text.trim();
-	return trimmed || undefined;
-}
+	"Future /yank commands will copy the full selected message in this session";
 
 function countNonEmptyLines(text: string): number {
 	return text.split(/\r?\n/).filter((line) => line.trim().length > 0).length;
@@ -96,11 +54,26 @@ export default function yankExtension(pi: ExtensionAPI) {
 	let skipMenuForSession = false;
 
 	pi.registerCommand("yank", {
-		description: "Copy the last assistant message or a code block from it",
-		handler: async (_args, ctx) => {
-			const text = getLastAssistantText(ctx.sessionManager.getBranch());
+		description:
+			"Copy the latest assistant message, or use /yank N for the N-th latest one",
+		handler: async (args, ctx) => {
+			const parsed = parseYankArgs(args);
+			if (!parsed.ok) {
+				ctx.ui.notify(parsed.message, "error");
+				return;
+			}
+
+			const text = getNthLatestAssistantText(
+				ctx.sessionManager.getBranch(),
+				parsed.nth,
+			);
 			if (!text) {
-				ctx.ui.notify(COPY_EMPTY_MESSAGE, "error");
+				ctx.ui.notify(
+					parsed.nth === 1
+						? COPY_EMPTY_MESSAGE
+						: `No ${parsed.nth}-th latest agent message to copy yet.`,
+					"error",
+				);
 				return;
 			}
 
@@ -118,7 +91,12 @@ export default function yankExtension(pi: ExtensionAPI) {
 			}
 
 			const menu = buildMenuOptions(text, codeBlocks);
-			const selected = await ctx.ui.select("Yank from last response", menu.all);
+			const selected = await ctx.ui.select(
+				parsed.nth === 1
+					? "Yank from latest response"
+					: `Yank from ${parsed.nth}-th latest response`,
+				menu.all,
+			);
 			if (!selected) return;
 
 			try {
