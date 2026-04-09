@@ -1,7 +1,7 @@
 {
 	"name": "pi-yank",
 	"private": false,
-	"version": "0.1.0",
+	"version": "0.1.2",
 	"type": "module",
 	"description": "Lightweight /yank extension for pi that copies the last assistant message or a selected code block.",
 	"keywords": [
